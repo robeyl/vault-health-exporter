@@ -25,6 +25,7 @@ import com.vaulthealth.exporter.hc.SdkAvailability
 import com.vaulthealth.exporter.storage.VaultPrefsState
 import com.vaulthealth.exporter.storage.db.ExportRecordEntity
 import com.vaulthealth.exporter.work.WorkScheduler
+import com.vaulthealth.exporter.watch.WatcherService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,6 +44,7 @@ data class UiState(
     val vaultName: String? = null,
     val vaultWritable: Boolean = false,
     val cadence: ScheduleCadence = ScheduleCadence.NONE,
+    val watcherSeconds: Int = 0,
     val grantedCount: Int = 0,
     val totalCount: Int = 0,
     val missingTypes: List<String> = emptyList(),
@@ -107,6 +109,12 @@ class MainViewModel(
     init {
         availability.value = container.gateway.availability()
         refreshPermissions()
+        // Restart the watcher if it was left on (it may have been killed by the system).
+        viewModelScope.launch {
+            if (container.prefs.snapshot().watcherSeconds > 0) {
+                runCatching { WatcherService.start(app) }
+            }
+        }
     }
 
     fun refreshPermissions() {
@@ -173,8 +181,26 @@ class MainViewModel(
         status.value = "${result.size} Health Connect permissions granted"
     }
 
-    fun setCadence(cadence: ScheduleCadence) {
+    /**
+     * Foreground watcher interval in seconds (0 = off). Health Connect offers no push API, so
+     * near-immediate export is a short poll; a foreground service is the only way to run one
+     * faster than WorkManager's 15-minute floor.
+     */
+    fun setWatcher(seconds: Int) {
         viewModelScope.launch {
+            container.prefs.setWatcherSeconds(seconds)
+            runCatching {
+                if (seconds > 0) WatcherService.start(app) else WatcherService.stop(app)
+            }
+            status.value = if (seconds > 0) {
+                "Watcher on: checks every ${seconds}s"
+            } else {
+                "Watcher off"
+            }
+        }
+    }
+
+    fun setCadence(cadence: ScheduleCadence) {        viewModelScope.launch {
             container.prefs.setCadence(cadence)
             WorkScheduler.apply(app, cadence)
             status.value = when (cadence) {
@@ -312,6 +338,7 @@ class MainViewModel(
             },
             vaultWritable = mine.flags.vaultWritable,
             cadence = prefs.cadence,
+            watcherSeconds = prefs.watcherSeconds,
             grantedCount = granted,
             totalCount = HealthPermissions.slots.size,
             missingTypes = missing,

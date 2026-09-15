@@ -42,6 +42,7 @@ fun HomeScreen(
     onSnapshotCustom: (LocalDate, LocalDate) -> Unit,
     onExportNow: () -> Unit,
     onSetCadence: (ScheduleCadence) -> Unit,
+    onSetWatcher: (Int) -> Unit,
     onRefresh: () -> Unit,
 ) {
     Column(
@@ -132,6 +133,13 @@ fun HomeScreen(
                     CadenceChip("Off", state.cadence == ScheduleCadence.NONE) { onSetCadence(ScheduleCadence.NONE) }
                     CadenceChip("Daily", state.cadence == ScheduleCadence.DAILY) { onSetCadence(ScheduleCadence.DAILY) }
                     CadenceChip("Weekly", state.cadence == ScheduleCadence.WEEKLY) { onSetCadence(ScheduleCadence.WEEKLY) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Watch", Modifier.fillMaxWidth(0.18f))
+                    CadenceChip("Off", state.watcherSeconds == 0) { onSetWatcher(0) }
+                    CadenceChip("1m", state.watcherSeconds == 60) { onSetWatcher(60) }
+                    CadenceChip("5m", state.watcherSeconds == 300) { onSetWatcher(300) }
+                    CadenceChip("15m", state.watcherSeconds == 900) { onSetWatcher(900) }
                 }
             }
         }

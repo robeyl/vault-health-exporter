@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -56,6 +57,9 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
             viewModel.refreshPermissions()
         }
+
+    private val notificationLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     /**
      * GPS route access. connect-client 1.1.0 predates READ_EXERCISE_ROUTES, so requesting it
@@ -117,6 +121,15 @@ class MainActivity : ComponentActivity() {
                     onSnapshotCustom = { start, end -> viewModel.runSnapshot(start, end) },
                     onExportNow = { viewModel.exportNow() },
                     onSetCadence = { viewModel.setCadence(it) },
+                    onSetWatcher = { seconds ->
+                        if (seconds > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        viewModel.setWatcher(seconds)
+                    },
                     onRefresh = { viewModel.refreshPermissions() },
                 )
             }

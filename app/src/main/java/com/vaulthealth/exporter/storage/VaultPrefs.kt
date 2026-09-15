@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.vaulthealth.core.model.VheJson
@@ -19,6 +20,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 data class VaultPrefsState(
     val treeUri: String?,
     val cadence: ScheduleCadence,
+    /** Foreground watcher poll interval in seconds; 0 means the watcher is off. */
+    val watcherSeconds: Int,
     val changeToken: String?,
     val tokenError: TokenErrorKind,
     val lastSnapshotAt: String?,
@@ -38,6 +41,7 @@ class VaultPrefs(private val context: Context) {
     private object Keys {
         val VAULT_URI = stringPreferencesKey("vault_tree_uri")
         val SCHEDULE = stringPreferencesKey("schedule_cadence")
+        val WATCHER_SECONDS = intPreferencesKey("watcher_seconds")
         val CHANGE_TOKEN = stringPreferencesKey("change_token")
         val TOKEN_ERROR = stringPreferencesKey("token_error")
         val LAST_SNAPSHOT_AT = stringPreferencesKey("last_snapshot_at")
@@ -53,6 +57,7 @@ class VaultPrefs(private val context: Context) {
             treeUri = prefs[Keys.VAULT_URI],
             cadence = prefs[Keys.SCHEDULE]?.let { runCatching { ScheduleCadence.valueOf(it) }.getOrNull() }
                 ?: ScheduleCadence.NONE,
+            watcherSeconds = prefs[Keys.WATCHER_SECONDS] ?: 0,
             changeToken = prefs[Keys.CHANGE_TOKEN],
             tokenError = prefs[Keys.TOKEN_ERROR]?.let { runCatching { TokenErrorKind.valueOf(it) }.getOrNull() }
                 ?: TokenErrorKind.NONE,
@@ -71,6 +76,9 @@ class VaultPrefs(private val context: Context) {
 
     suspend fun setCadence(cadence: ScheduleCadence) =
         context.dataStore.edit { it[Keys.SCHEDULE] = cadence.name }
+
+    suspend fun setWatcherSeconds(seconds: Int) =
+        context.dataStore.edit { it[Keys.WATCHER_SECONDS] = seconds }
 
     suspend fun setChangeToken(token: String?) = context.dataStore.edit { prefs ->
         if (token == null) prefs.remove(Keys.CHANGE_TOKEN) else prefs[Keys.CHANGE_TOKEN] = token

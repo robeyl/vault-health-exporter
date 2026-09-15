@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Vault Health Exporter</string>
+    <string name="watcher_channel">Data watcher</string>
+    <string name="watcher_running">Watching for new health data</string>
+    <string name="watcher_idle">No new data</string>
+    <string name="watcher_no_folder">Select a vault folder</string>
     <string name="permissions_rationale">
         Vault Health Exporter reads your Health Connect records and writes them, unchanged,
         into a folder you choose inside your Syncthing-synced Obsidian vault. It has no
