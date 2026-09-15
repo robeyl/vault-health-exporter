@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.content.ContextCompat
-import androidx.health.connect.client.records.ExerciseRoute
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -49,6 +48,7 @@ data class UiState(
     val missingTypes: List<String> = emptyList(),
     val historyGranted: Boolean = false,
     val backgroundGranted: Boolean = false,
+    val routesGranted: Boolean = false,
     val changeTokenPresent: Boolean = false,
     val tokenWarning: String? = null,
     val lastSnapshotAt: String? = null,
@@ -279,19 +279,8 @@ class MainViewModel(
     }
 
     fun onRoutePermissionDenied() {
-        status.value = "Route access not granted"
-    }
-
-    /**
-     * Per-session consent fallback (Health Connect's ExerciseRouteRequestContract). Used when the
-     * bulk route permission is unavailable.
-     */
-    fun onRouteGranted(sessionId: String, route: ExerciseRoute?) {
-        if (route == null) {
-            status.value = "Route access not granted"
-            return
-        }
-        importAllRoutes()
+        status.value = "Route access not granted. Enable it in Health Connect → App permissions → " +
+            "Vault Health Exporter."
     }
 
     /** Reads the folder directly from private storage rather than a possibly-uncollected flow. */
@@ -325,6 +314,7 @@ class MainViewModel(
             missingTypes = missing,
             historyGranted = HealthPermissions.READ_HISTORY in mine.granted,
             backgroundGranted = HealthPermissions.READ_BACKGROUND in mine.granted,
+            routesGranted = HealthPermissions.READ_EXERCISE_ROUTES in mine.granted,
             changeTokenPresent = !prefs.changeToken.isNullOrBlank(),
             tokenWarning = TokenPolicy.promptFor(TokenPolicy.issueFor(prefs.tokenError))
                 ?: if (prefs.changeToken.isNullOrBlank()) {

@@ -14,7 +14,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
-import androidx.health.connect.client.contracts.ExerciseRouteRequestContract
 import com.vaulthealth.exporter.hc.HealthPermissions
 import com.vaulthealth.exporter.ui.HomeScreen
 import com.vaulthealth.exporter.ui.MainViewModel
@@ -29,8 +28,6 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
         MainViewModel.factory(application, container)
     }
-
-    private var routeSessionId: String? = null
 
     private val folderPicker =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -61,34 +58,16 @@ class MainActivity : ComponentActivity() {
         }
 
     /**
-     * GPS: request the bulk route permission on its own first. connect-client rejects it when it
+     * GPS: request the bulk route permission on its own. connect-client 1.1.0 rejects it when it
      * is bundled with the record permissions and closes the whole sheet, so it must be alone.
-     * If it is unavailable, fall back to the per-session consent contract.
      */
     private val routePermissionLauncher =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
             if (HealthPermissions.READ_EXERCISE_ROUTES in granted) {
                 viewModel.importAllRoutes()
             } else {
-                val sessionId = viewModel.state.value.routeImportSessionId
-                if (sessionId != null) {
-                    routeSessionId = sessionId
-                    routeLauncher.launch(sessionId)
-                } else {
-                    viewModel.onRoutePermissionDenied()
-                }
+                viewModel.onRoutePermissionDenied()
             }
-        }
-
-    /**
-     * Foreground-only route consent. Android shows the Health Connect grant sheet for the given
-     * exercise session; only after approval do we read and export its route points.
-     */
-    private val routeLauncher =
-        registerForActivityResult(ExerciseRouteRequestContract()) { route ->
-            val sessionId = routeSessionId
-            routeSessionId = null
-            if (sessionId != null) viewModel.onRouteGranted(sessionId, route)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -119,7 +98,14 @@ class MainActivity : ComponentActivity() {
                     },
                     onOpenHealthConnect = { openHealthConnectSettings() },
                     onGrantRoute = { _ ->
-                        routePermissionLauncher.launch(setOf(HealthPermissions.READ_EXERCISE_ROUTES))
+                        // Requesting the route permission through connect-client 1.1.0 makes
+                        // Health Connect flash and close, so only do it when it is actually
+                        // missing; otherwise import straight away.
+                        if (viewModel.state.value.routesGranted) {
+                            viewModel.importAllRoutes()
+                        } else {
+                            routePermissionLauncher.launch(setOf(HealthPermissions.READ_EXERCISE_ROUTES))
+                        }
                     },
                     onSnapshotPreset = { days ->
                         viewModel.runSnapshot(
