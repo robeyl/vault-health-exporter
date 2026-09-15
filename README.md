@@ -66,13 +66,13 @@ If `keystore.properties` is absent, `assembleRelease` still produces an unsigned
 2. On the phone, allow installing unknown apps for your file manager / browser.
 3. Install the APK.
 4. Open **Vault Health Exporter**.
-5. Tap **Select folder** and choose the **vault root** (the folder Syncthing syncs, e.g.
-   `Documents/ObsidianVault`). Grant access; the app persists the SAF permission so it
-   survives reboots.
-   The app creates:
-   - `90 Private/Health/Raw/health-connect/snapshots/`
-   - `90 Private/Health/Raw/health-connect/deltas/`
-   - `90 Private/Health/Summaries/`
+5. Tap **Select folder** and choose the **destination folder** (e.g. a folder inside your
+   Syncthing-synced vault). Grant access; the app persists the SAF permission so it survives
+   reboots.
+   Exports are written **directly into that folder**, with no assumed vault structure:
+   - `<chosen>/snapshots/`
+   - `<chosen>/deltas/`
+   - `<chosen>/Summaries/`
 6. Tap **Permissions** and grant the Health Connect reads you want, plus **Activity
    recognition** (required for steps/distance on Android 10+).
 7. For a full historical export, tap **History** to grant *read health data history*, then use

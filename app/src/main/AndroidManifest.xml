@@ -80,6 +80,23 @@
             </intent-filter>
         </activity>
 
+        <!--
+          Android's "health permissions usage" intent. Health Connect's platform check
+          (PermissionUtils.hasHealthPermissionsUsageIntent) looks for exactly this action +
+          category; without it the consent screen aborts with
+          "App should support rationale intent, finishing!".
+        -->
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".RationaleActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
         <receiver
             android:name=".work.BootReceiver"
             android:enabled="true"
