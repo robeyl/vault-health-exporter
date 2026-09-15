@@ -170,7 +170,9 @@ object RecordMapper {
             values = mapOf(SummaryAggregator.KEY_KILOGRAMS to JsonPrimitive(record.weight.inKilograms)),
         )
 
-        else -> null
+        // Everything else (blood pressure, nutrition, HRV, VO2 max, …) goes through the generic
+        // reflective mapper so no Health Connect record type is dropped.
+        else -> HealthPermissions.typeOf(record)?.let { GenericRecordMapper.map(record, it) }
     }
 
     private fun exerciseValues(record: ExerciseSessionRecord): Map<String, JsonPrimitive> = buildMap {

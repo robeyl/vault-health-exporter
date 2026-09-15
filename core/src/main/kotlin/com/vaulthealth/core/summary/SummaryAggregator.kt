@@ -95,7 +95,9 @@ object SummaryAggregator {
 
                 RecordType.WEIGHT -> record.doubleValue(KEY_KILOGRAMS)?.let { weight = it }
 
-                RecordType.SPEED, RecordType.STEPS_CADENCE, RecordType.CYCLING_CADENCE -> Unit
+                // Speed, cadence, blood pressure, nutrition, etc. are exported but not aggregated
+                // into the daily note.
+                else -> Unit
             }
         }
 

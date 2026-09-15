@@ -153,11 +153,15 @@ Sleep is attributed to the **wake** date.
 
 ## Permissions
 
-Requested on demand, individually, from the UI:
+The app exports **every Health Connect record type** (41 at the time of writing): steps,
+distance, active/total calories, exercise sessions, heart rate, resting heart rate, HRV, SpO₂,
+respiratory rate, sleep, speed, steps/cycling cadence, weight, height, body fat, lean/water/bone
+mass, basal metabolic rate, body/basal/skin temperature, blood glucose, blood pressure, hydration,
+nutrition, elevation, floors, power, VO₂ max, wheelchair pushes, mindfulness, planned exercise and
+the cycle-tracking types. Types without a hand-written mapping go through a generic reflective
+mapper, so newly added Health Connect types still export.
 
-`Steps`, `Distance`, `ActiveCaloriesBurned`, `TotalCaloriesBurned`, `ExerciseSession`,
-`HeartRate`, `RestingHeartRate`, `OxygenSaturation`, `SleepSession`, `Speed`,
-`StepsCadence`, `CyclingPedalingCadence`, `Weight`.
+Requested on demand, individually, from the UI (`Data types X/41` → **Grant**).
 
 Special, separately requested grants:
 
@@ -167,13 +171,23 @@ Special, separately requested grants:
 
 There is **no `INTERNET` permission and no `ACCESS_NETWORK_STATE`** in the built APK.
 
-### Exercise routes (opt-in, foreground only)
+### Exercise routes (GPS)
 
-Routes are never collected by background work. A session whose route needs consent is exported
-with `"route":{"state":"consent_required"}` and shown in the app as **Grant route access**. Tapping
-it launches Android's `ExerciseRouteRequestContract`; after approval the session is re-read and its
-route points are written into a new immutable delta file. `no_data` and `consent_required` states
-are always preserved truthfully.
+Routes are only ever read in the foreground and written to their own immutable file; background
+work records `consent_required`/`no_data`.
+
+Reality check on where GPS comes from:
+
+- **Strava does not write GPS to Health Connect.** Its manifest declares only `WRITE_DISTANCE`,
+  `WRITE_EXERCISE`, `WRITE_TOTAL_CALORIES_BURNED` and `READ_WEIGHT` — there is no
+  `WRITE_EXERCISE_ROUTE`, so Strava can never populate Health Connect routes.
+- **Mi Fitness does** (`WRITE_EXERCISE_ROUTE`). Enable Mi Fitness → Health Connect data sharing so
+  its routes land in Health Connect; then this app can read them.
+- The app first requests `android.permission.health.READ_EXERCISE_ROUTES` on its own (bulk route
+  access, added after connect-client 1.1.0, so referenced by raw string). If that is unavailable it
+  falls back to the per-session `ExerciseRouteRequestContract`.
+- If Health Connect holds no route for a session, nothing can be exported for it — the manifest
+  issue counters (`route_consent_required`, `route_no_data`) report this honestly.
 
 ---
 

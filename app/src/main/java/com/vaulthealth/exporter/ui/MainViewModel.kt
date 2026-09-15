@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.vaulthealth.core.daterange.DateRange
+import com.vaulthealth.core.model.RouteState
 import com.vaulthealth.core.naming.VaultPaths
 import com.vaulthealth.core.token.TokenIssue
 import com.vaulthealth.core.token.TokenPolicy
@@ -33,22 +34,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-
-data class PermissionStatus(
-    val label: String,
-    val permission: String,
-    val granted: Boolean,
-    val special: Boolean = false,
-)
+import java.time.temporal.ChronoUnit
 
 data class UiState(
     val availability: SdkAvailability = SdkAvailability.NOT_SUPPORTED,
-    val vaultPath: String? = null,
+    val vaultName: String? = null,
     val vaultWritable: Boolean = false,
     val cadence: ScheduleCadence = ScheduleCadence.NONE,
-    val permissions: List<PermissionStatus> = emptyList(),
+    val grantedCount: Int = 0,
+    val totalCount: Int = 0,
+    val missingTypes: List<String> = emptyList(),
     val historyGranted: Boolean = false,
     val backgroundGranted: Boolean = false,
     val changeTokenPresent: Boolean = false,
@@ -58,6 +56,7 @@ data class UiState(
     val lastDeltaAt: String? = null,
     val lastDeltaFile: String? = null,
     val pendingRoutes: List<PendingRouteConsent> = emptyList(),
+    val routeImportSessionId: String? = null,
     val history: List<ExportRecordEntity> = emptyList(),
     val status: String = "",
     val busy: Boolean = false,
@@ -66,6 +65,7 @@ data class UiState(
 private data class Flags(
     val activityRecognition: Boolean,
     val vaultWritable: Boolean,
+    val routeImportSessionId: String?,
 )
 
 private data class LocalState(
@@ -87,9 +87,11 @@ class MainViewModel(
     private val granted = MutableStateFlow<Set<String>>(emptySet())
     private val activityRecognition = MutableStateFlow(false)
     private val vaultWritable = MutableStateFlow(false)
+    private val routeImportSessionId = MutableStateFlow<String?>(null)
 
-    private val flags = combine(activityRecognition, vaultWritable) { activity, writable ->
-        Flags(activity, writable)
+    private val flags = combine(activityRecognition, vaultWritable, routeImportSessionId) {
+            activity, writable, routeSession ->
+        Flags(activity, writable, routeSession)
     }
 
     private val local = combine(status, busy, availability, granted, flags) {
@@ -129,6 +131,20 @@ class MainViewModel(
             val raw = container.prefs.snapshot().treeUri
             vaultWritable.value = raw != null && withContext(Dispatchers.IO) {
                 container.writer.canWrite(Uri.parse(raw))
+            }
+
+            // The consent dialog must be launched for a session that actually HAS a route,
+            // otherwise Health Connect returns null. Prefer any session reporting
+            // consent_required (meaning a route exists but is not yet readable).
+            routeImportSessionId.value = withContext(Dispatchers.IO) {
+                runCatching {
+                    val end = Instant.now()
+                    val start = end.minus(365, ChronoUnit.DAYS)
+                    container.gateway.readAll(ExerciseSessionRecord::class, start, end)
+                        .mapNotNull { RecordMapper.map(it, allowRoutes = false) }
+                        .firstOrNull { it.route?.state == RouteState.CONSENT_REQUIRED }
+                        ?.id
+                }.getOrNull()
             }
         }
     }
@@ -222,39 +238,60 @@ class MainViewModel(
         }
     }
 
-    fun onRouteGranted(sessionId: String, route: ExerciseRoute?) {
-        if (route == null) {
-            status.value = "Route access was not granted for $sessionId"
-            return
-        }
+    /**
+     * Bulk route import, used once READ_EXERCISE_ROUTES is granted. Reads every exercise session
+     * in the last year and exports all routes that are now readable.
+     */
+    fun importAllRoutes() {
         viewModelScope.launch {
             val uri = vaultUriOrReport() ?: return@launch
+            busy.value = true
             try {
-                val run = withContext(Dispatchers.IO) {
-                    val session = container.gateway.readOne(ExerciseSessionRecord::class, sessionId)
-                    val record = session?.let { RecordMapper.map(it, allowRoutes = true) }
-                    if (record == null) {
-                        null
-                    } else {
-                        container.deltaEngine.writeRoutePatch(uri, record)
-                    }
+                val end = Instant.now()
+                val start = end.minus(365, ChronoUnit.DAYS)
+                val withRoutes = withContext(Dispatchers.IO) {
+                    container.gateway.readAll(ExerciseSessionRecord::class, start, end)
+                        .mapNotNull { RecordMapper.map(it, allowRoutes = true) }
+                        .filter {
+                            val route = it.route
+                            route != null && route.state == RouteState.AVAILABLE && route.points.isNotEmpty()
+                        }
                 }
-                if (run == null) {
-                    status.value = "Could not re-read session $sessionId"
+                if (withRoutes.isEmpty()) {
+                    status.value = "No route data is stored in Health Connect"
                     return@launch
                 }
+                val run = withContext(Dispatchers.IO) {
+                    container.deltaEngine.writeRoutePatch(uri, withRoutes)
+                }
                 if (run is DeltaRun.Completed) {
-                    val remaining = container.prefs.snapshot().pendingRoutes
-                        .filterNot { it.sessionId == sessionId }
-                    container.prefs.setPendingRoutes(remaining)
-                    status.value = "Route patch ${run.fileName} written"
+                    container.prefs.setPendingRoutes(emptyList())
+                    status.value = "${withRoutes.size} routes exported (${run.fileName})"
                 } else {
-                    status.value = "Route patch failed for $sessionId"
+                    status.value = "Route export failed"
                 }
             } catch (t: Throwable) {
-                status.value = "Route patch failed: ${t.message ?: t::class.java.simpleName}"
+                status.value = "Route export failed: ${describeError(t)}"
+            } finally {
+                busy.value = false
             }
         }
+    }
+
+    fun onRoutePermissionDenied() {
+        status.value = "Route access not granted"
+    }
+
+    /**
+     * Per-session consent fallback (Health Connect's ExerciseRouteRequestContract). Used when the
+     * bulk route permission is unavailable.
+     */
+    fun onRouteGranted(sessionId: String, route: ExerciseRoute?) {
+        if (route == null) {
+            status.value = "Route access not granted"
+            return
+        }
+        importAllRoutes()
     }
 
     /** Reads the folder directly from private storage rather than a possibly-uncollected flow. */
@@ -272,19 +309,20 @@ class MainViewModel(
         history: List<ExportRecordEntity>,
         mine: LocalState,
     ): UiState {
-        val permissionStatuses = HealthPermissions.slots.map { slot ->
-            PermissionStatus(
-                label = slot.recordType.wireName,
-                permission = slot.permission,
-                granted = slot.permission in mine.granted,
-            )
-        }
+        val granted = HealthPermissions.slots.count { it.permission in mine.granted }
+        val missing = HealthPermissions.slots
+            .filter { it.permission !in mine.granted }
+            .map { it.recordType.wireName }
         return UiState(
             availability = mine.availability,
-            vaultPath = prefs.treeUri,
+            vaultName = prefs.treeUri?.let { uri ->
+                runCatching { Uri.decode(uri).substringAfterLast('/') }.getOrNull()
+            },
             vaultWritable = mine.flags.vaultWritable,
             cadence = prefs.cadence,
-            permissions = permissionStatuses,
+            grantedCount = granted,
+            totalCount = HealthPermissions.slots.size,
+            missingTypes = missing,
             historyGranted = HealthPermissions.READ_HISTORY in mine.granted,
             backgroundGranted = HealthPermissions.READ_BACKGROUND in mine.granted,
             changeTokenPresent = !prefs.changeToken.isNullOrBlank(),
@@ -299,7 +337,8 @@ class MainViewModel(
             lastDeltaAt = prefs.lastDeltaAt,
             lastDeltaFile = prefs.lastDeltaFile,
             pendingRoutes = prefs.pendingRoutes,
-            history = history.take(20),
+            routeImportSessionId = mine.flags.routeImportSessionId,
+            history = history.take(3),
             status = mine.status.ifBlank { prefs.lastMessage ?: "" },
             busy = mine.busy,
         )

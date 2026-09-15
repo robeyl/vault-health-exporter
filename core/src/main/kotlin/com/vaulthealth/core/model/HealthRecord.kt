@@ -23,6 +23,41 @@ enum class RecordType(val wireName: String) {
     @SerialName("StepsCadence") STEPS_CADENCE("StepsCadence"),
     @SerialName("CyclingPedalingCadence") CYCLING_CADENCE("CyclingPedalingCadence"),
     @SerialName("Weight") WEIGHT("Weight"),
+    @SerialName("BasalBodyTemperature") BASAL_BODY_TEMPERATURE("BasalBodyTemperature"),
+    @SerialName("BasalMetabolicRate") BASAL_METABOLIC_RATE("BasalMetabolicRate"),
+    @SerialName("BloodGlucose") BLOOD_GLUCOSE("BloodGlucose"),
+    @SerialName("BloodPressure") BLOOD_PRESSURE("BloodPressure"),
+    @SerialName("BodyFat") BODY_FAT("BodyFat"),
+    @SerialName("BodyTemperature") BODY_TEMPERATURE("BodyTemperature"),
+    @SerialName("BodyWaterMass") BODY_WATER_MASS("BodyWaterMass"),
+    @SerialName("BoneMass") BONE_MASS("BoneMass"),
+    @SerialName("CervicalMucus") CERVICAL_MUCUS("CervicalMucus"),
+    @SerialName("ElevationGained") ELEVATION_GAINED("ElevationGained"),
+    @SerialName("FloorsClimbed") FLOORS_CLIMBED("FloorsClimbed"),
+    @SerialName("HeartRateVariabilityRmssd") HRV_RMSSD("HeartRateVariabilityRmssd"),
+    @SerialName("Height") HEIGHT("Height"),
+    @SerialName("Hydration") HYDRATION("Hydration"),
+    @SerialName("IntermenstrualBleeding") INTERMENSTRUAL_BLEEDING("IntermenstrualBleeding"),
+    @SerialName("LeanBodyMass") LEAN_BODY_MASS("LeanBodyMass"),
+    @SerialName("MenstruationFlow") MENSTRUATION_FLOW("MenstruationFlow"),
+    @SerialName("MenstruationPeriod") MENSTRUATION_PERIOD("MenstruationPeriod"),
+    @SerialName("MindfulnessSession") MINDFULNESS_SESSION("MindfulnessSession"),
+    @SerialName("Nutrition") NUTRITION("Nutrition"),
+    @SerialName("OvulationTest") OVULATION_TEST("OvulationTest"),
+    @SerialName("PlannedExerciseSession") PLANNED_EXERCISE("PlannedExerciseSession"),
+    @SerialName("Power") POWER("Power"),
+    @SerialName("RespiratoryRate") RESPIRATORY_RATE("RespiratoryRate"),
+    @SerialName("SexualActivity") SEXUAL_ACTIVITY("SexualActivity"),
+    @SerialName("SkinTemperature") SKIN_TEMPERATURE("SkinTemperature"),
+    @SerialName("Vo2Max") VO2_MAX("Vo2Max"),
+    @SerialName("WheelchairPushes") WHEELCHAIR_PUSHES("WheelchairPushes"),
+    ;
+
+    companion object {
+        private val byWireName = entries.associateBy { it.wireName }
+
+        fun fromWireName(name: String): RecordType? = byWireName[name]
+    }
 }
 
 /** Whether an exercise route was exported, was absent, or needs foreground consent. */

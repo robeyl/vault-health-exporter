@@ -61,6 +61,26 @@ class MainActivity : ComponentActivity() {
         }
 
     /**
+     * GPS: request the bulk route permission on its own first. connect-client rejects it when it
+     * is bundled with the record permissions and closes the whole sheet, so it must be alone.
+     * If it is unavailable, fall back to the per-session consent contract.
+     */
+    private val routePermissionLauncher =
+        registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+            if (HealthPermissions.READ_EXERCISE_ROUTES in granted) {
+                viewModel.importAllRoutes()
+            } else {
+                val sessionId = viewModel.state.value.routeImportSessionId
+                if (sessionId != null) {
+                    routeSessionId = sessionId
+                    routeLauncher.launch(sessionId)
+                } else {
+                    viewModel.onRoutePermissionDenied()
+                }
+            }
+        }
+
+    /**
      * Foreground-only route consent. Android shows the Health Connect grant sheet for the given
      * exercise session; only after approval do we read and export its route points.
      */
@@ -98,9 +118,8 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     onOpenHealthConnect = { openHealthConnectSettings() },
-                    onGrantRoute = { sessionId ->
-                        routeSessionId = sessionId
-                        routeLauncher.launch(sessionId)
+                    onGrantRoute = { _ ->
+                        routePermissionLauncher.launch(setOf(HealthPermissions.READ_EXERCISE_ROUTES))
                     },
                     onSnapshotPreset = { days ->
                         viewModel.runSnapshot(

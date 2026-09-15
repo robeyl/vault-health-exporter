@@ -19,6 +19,7 @@ object ManifestBuilder {
         RecordType.SPEED,
         RecordType.STEPS_CADENCE,
         RecordType.CYCLING_CADENCE,
+        RecordType.POWER,
     )
 
     fun recordCounts(records: List<HealthRecord>): Map<String, Int> =

@@ -152,11 +152,13 @@ class DeltaEngine(
     }
 
     /**
-     * Foreground-only route patch. Written after the user grants route access for a session via
-     * [androidx.health.connect.client.contracts.ExerciseRouteRequestContract]; never called from
-     * background work. Immutable, like every other export.
+     * Foreground-only route patch. Written after the user grants route access via
+     * [androidx.health.connect.client.contracts.ExerciseRouteRequestContract]. A single
+     * "Always allow" grant lets us export every session's route, so this takes a batch and
+     * writes one immutable file. Never called from background work.
      */
-    suspend fun writeRoutePatch(treeUri: Uri, record: HealthRecord): DeltaRun {
+    suspend fun writeRoutePatch(treeUri: Uri, records: List<HealthRecord>): DeltaRun {
+        if (records.isEmpty()) return DeltaRun.NoChanges
         val exportedAt = Instant.now()
         val header = ExportHeader(
             schema = NdjsonSchema.NAME,
@@ -165,7 +167,7 @@ class DeltaEngine(
             exportedAt = exportedAt.toString(),
             app = AppInfo(version = BuildConfig.VERSION_NAME),
         )
-        val built = NdjsonCodec.buildDelta(header, listOf(record), emptyList())
+        val built = NdjsonCodec.buildDelta(header, records, emptyList())
         val fileName = uniqueName(
             treeUri,
             VaultPaths.DELTAS,
@@ -181,8 +183,8 @@ class DeltaEngine(
                 fileName = fileName,
                 kind = "route",
                 dirPath = VaultPaths.DELTAS,
-                recordCount = 1,
-                upserts = 1,
+                recordCount = records.size,
+                upserts = records.size,
                 deletions = 0,
                 summaries = 0,
                 sha256 = built.fileSha256,
@@ -191,7 +193,7 @@ class DeltaEngine(
                 status = "written",
             ),
         )
-        return DeltaRun.Completed(fileName, 1, 0, 0)
+        return DeltaRun.Completed(fileName, records.size, 0, 0)
     }
 
     private fun affectedDays(upserts: List<HealthRecord>, zone: ZoneId, now: Instant): List<LocalDate> {
