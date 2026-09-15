@@ -1,6 +1,7 @@
 package com.vaulthealth.exporter.export
 
 import android.net.Uri
+import com.vaulthealth.core.checksum.ContentHash
 import com.vaulthealth.core.dedup.Dedup
 import com.vaulthealth.core.model.HealthRecord
 import com.vaulthealth.core.model.NdjsonSchema
@@ -89,6 +90,16 @@ class DeltaEngine(
                     return DeltaRun.NoChanges
                 }
 
+                // These changes may already have been exported (e.g. a previous run wrote the
+                // file but the token was not advanced). Skip the write, but still advance the
+                // token so we stop reprocessing them.
+                val contentId = ContentHash.ofDelta(upserts, outcome.deletedIds)
+                if (history.countByContent("delta", contentId) > 0) {
+                    prefs.setChangeToken(outcome.nextToken)
+                    prefs.setTokenError(TokenErrorKind.NONE)
+                    return DeltaRun.NoChanges
+                }
+
                 val header = ExportHeader(
                     schema = NdjsonSchema.NAME,
                     version = NdjsonSchema.VERSION,
@@ -138,6 +149,7 @@ class DeltaEngine(
                         verified = fileOutcome.verified,
                         createdAt = exportedAt.toString(),
                         status = "written",
+                        contentId = contentId,
                     ),
                 )
 
@@ -159,6 +171,9 @@ class DeltaEngine(
      */
     suspend fun writeRoutePatch(treeUri: Uri, records: List<HealthRecord>): DeltaRun {
         if (records.isEmpty()) return DeltaRun.NoChanges
+        // Routes rarely change; never write the same route set twice.
+        val contentId = ContentHash.ofRecords(records)
+        if (history.countByContent("route", contentId) > 0) return DeltaRun.NoChanges
         val exportedAt = Instant.now()
         val header = ExportHeader(
             schema = NdjsonSchema.NAME,
@@ -191,6 +206,7 @@ class DeltaEngine(
                 verified = fileOutcome.verified,
                 createdAt = exportedAt.toString(),
                 status = "written",
+                contentId = contentId,
             ),
         )
         return DeltaRun.Completed(fileName, records.size, 0, 0)

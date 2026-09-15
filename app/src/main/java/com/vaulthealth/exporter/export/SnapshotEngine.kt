@@ -1,6 +1,7 @@
 package com.vaulthealth.exporter.export
 
 import android.net.Uri
+import com.vaulthealth.core.checksum.ContentHash
 import com.vaulthealth.core.checksum.Sha256
 import com.vaulthealth.core.dedup.Dedup
 import com.vaulthealth.core.model.HealthRecord
@@ -58,7 +59,7 @@ class SnapshotEngine(
 
         onProgress("Reading Health Connect records…")
         val native = HealthPermissions.recordTypes.flatMap { klass ->
-            gateway.readAll(klass, range.start, range.end)
+            gateway.readAllOrEmpty(klass, range.start, range.end)
         }
         val mapped = native.mapNotNull { RecordMapper.map(it, allowRoutes) }
         val deduped = Dedup.dedupe(mapped)
@@ -74,6 +75,17 @@ class SnapshotEngine(
             app = AppInfo(version = BuildConfig.VERSION_NAME),
         )
         val built = NdjsonCodec.buildSnapshot(header, deduped.records)
+
+        // Refuse to write the same data twice, whatever the filename would have been.
+        val contentId = ContentHash.ofRecords(deduped.records)
+        if (history.countByContent("snapshot", contentId) > 0) {
+            return ExportRunResult(
+                kind = "snapshot",
+                outcomes = listOf(WriteOutcome.Skipped("(duplicate)", "identical snapshot already exported")),
+                recordTotal = deduped.records.size,
+                message = "Identical data was already exported; nothing written",
+            )
+        }
 
         val baseName = FileNames.snapshot(range.startLocalDate(zone), range.endLocalDate(zone))
         val fileName = uniqueName(treeUri, VaultPaths.SNAPSHOTS, baseName)
@@ -120,6 +132,7 @@ class SnapshotEngine(
                     verified = fileOutcome.verified,
                     createdAt = exportedAt.toString(),
                     status = "written",
+                    contentId = contentId,
                 ),
             )
         } else {

@@ -44,7 +44,7 @@ class SummaryEngine(
     ): List<WriteOutcome> = days.map { day ->
         val range = DateRange.ofLocalDates(day, day, zone)
         val records = HealthPermissions.recordTypes
-            .flatMap { gateway.readAll(it, range.start, range.end) }
+            .flatMap { gateway.readAllOrEmpty(it, range.start, range.end) }
             .mapNotNull { RecordMapper.map(it, allowRoutes = false) }
         writeDay(treeUri, day, zone, generatedAt, records)
     }

@@ -49,7 +49,7 @@
     <uses-permission android:name="android.permission.health.READ_POWER" />
     <uses-permission android:name="android.permission.health.READ_VO2_MAX" />
     <uses-permission android:name="android.permission.health.READ_WHEELCHAIR_PUSHES" />
-    <uses-permission android:name="android.permission.health.READ_MINDFULNESS_SESSION" />
+    <uses-permission android:name="android.permission.health.READ_MINDFULNESS" />
     <uses-permission android:name="android.permission.health.READ_PLANNED_EXERCISE" />
     <uses-permission android:name="android.permission.health.READ_MENSTRUATION" />
     <uses-permission android:name="android.permission.health.READ_INTERMENSTRUAL_BLEEDING" />

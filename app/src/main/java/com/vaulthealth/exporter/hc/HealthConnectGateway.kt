@@ -75,6 +75,13 @@ class HealthConnectGateway(private val context: Context) {
         return out
     }
 
+    /**
+     * Like [readAll] but never fails the caller: a missing/ungranted permission for one record
+     * type must not abort a whole export.
+     */
+    suspend fun <T : Record> readAllOrEmpty(klass: KClass<T>, start: Instant, end: Instant): List<T> =
+        runCatching { readAll(klass, start, end) }.getOrDefault(emptyList())
+
     suspend fun <T : Record> readOne(klass: KClass<T>, recordId: String): T? =
         runCatching { requireClient().readRecord(klass, recordId).record }.getOrNull()
 

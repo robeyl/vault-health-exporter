@@ -58,16 +58,13 @@ class MainActivity : ComponentActivity() {
         }
 
     /**
-     * GPS: request the bulk route permission on its own. connect-client 1.1.0 rejects it when it
-     * is bundled with the record permissions and closes the whole sheet, so it must be alone.
+     * GPS route access. connect-client 1.1.0 predates READ_EXERCISE_ROUTES, so requesting it
+     * through the Health Connect permission contract makes that screen flash and close. The
+     * platform declares it as a normal dangerous permission, so request it directly.
      */
     private val routePermissionLauncher =
-        registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
-            if (HealthPermissions.READ_EXERCISE_ROUTES in granted) {
-                viewModel.importAllRoutes()
-            } else {
-                viewModel.onRoutePermissionDenied()
-            }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) viewModel.importAllRoutes() else viewModel.onRoutePermissionDenied()
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,13 +95,14 @@ class MainActivity : ComponentActivity() {
                     },
                     onOpenHealthConnect = { openHealthConnectSettings() },
                     onGrantRoute = { _ ->
-                        // Requesting the route permission through connect-client 1.1.0 makes
-                        // Health Connect flash and close, so only do it when it is actually
-                        // missing; otherwise import straight away.
                         if (viewModel.state.value.routesGranted) {
                             viewModel.importAllRoutes()
                         } else {
-                            routePermissionLauncher.launch(setOf(HealthPermissions.READ_EXERCISE_ROUTES))
+                            runCatching {
+                                routePermissionLauncher.launch(HealthPermissions.READ_EXERCISE_ROUTES)
+                            }.onFailure {
+                                viewModel.onRoutePermissionDenied()
+                            }
                         }
                     },
                     onSnapshotPreset = { days ->

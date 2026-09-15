@@ -264,11 +264,14 @@ class MainViewModel(
                 val run = withContext(Dispatchers.IO) {
                     container.deltaEngine.writeRoutePatch(uri, withRoutes)
                 }
-                if (run is DeltaRun.Completed) {
-                    container.prefs.setPendingRoutes(emptyList())
-                    status.value = "${withRoutes.size} routes exported (${run.fileName})"
-                } else {
-                    status.value = "Route export failed"
+                when (run) {
+                    is DeltaRun.Completed -> {
+                        container.prefs.setPendingRoutes(emptyList())
+                        status.value = "${withRoutes.size} routes exported (${run.fileName})"
+                    }
+
+                    DeltaRun.NoChanges -> status.value = "Routes unchanged; nothing written"
+                    else -> status.value = "Route export failed"
                 }
             } catch (t: Throwable) {
                 status.value = "Route export failed: ${describeError(t)}"

@@ -25,6 +25,7 @@ data class ExportRecordEntity(
     val verified: Boolean,
     val createdAt: String,
     val status: String,
+    val contentId: String = "",
 )
 
 @Dao
@@ -37,9 +38,12 @@ interface ExportHistoryDao {
 
     @Query("SELECT * FROM exports ORDER BY id DESC LIMIT 1")
     suspend fun latest(): ExportRecordEntity?
+
+    @Query("SELECT COUNT(*) FROM exports WHERE kind = :kind AND contentId = :contentId AND status = 'written'")
+    suspend fun countByContent(kind: String, contentId: String): Int
 }
 
-@Database(entities = [ExportRecordEntity::class], version = 1, exportSchema = false)
+@Database(entities = [ExportRecordEntity::class], version = 2, exportSchema = false)
 abstract class VaultDatabase : RoomDatabase() {
     abstract fun exports(): ExportHistoryDao
 
