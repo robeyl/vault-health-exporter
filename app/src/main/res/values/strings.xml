@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vault Health Exporter</string>
+    <string name="permissions_rationale">
+        Vault Health Exporter reads your Health Connect records and writes them, unchanged,
+        into a folder you choose inside your Syncthing-synced Obsidian vault. It has no
+        network permission, no account and no analytics.
+    </string>
+</resources>
