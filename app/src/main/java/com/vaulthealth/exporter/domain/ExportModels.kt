@@ -22,6 +22,9 @@ sealed interface WriteOutcome {
 
     data class AlreadyExists(val fileName: String) : WriteOutcome
     data class Failed(val reason: String) : WriteOutcome
+
+    /** Nothing to write (e.g. a day with no activity gets no summary note). */
+    data class Skipped(val fileName: String, val reason: String) : WriteOutcome
 }
 
 data class ExportRunResult(

@@ -113,6 +113,9 @@ class MainActivity : ComponentActivity() {
                             java.time.LocalDate.now(),
                         )
                     },
+                    onSnapshotAllTime = {
+                        viewModel.runSnapshot(java.time.LocalDate.of(2000, 1, 1), java.time.LocalDate.now())
+                    },
                     onSnapshotCustom = { start, end -> viewModel.runSnapshot(start, end) },
                     onExportNow = { viewModel.exportNow() },
                     onSetCadence = { viewModel.setCadence(it) },

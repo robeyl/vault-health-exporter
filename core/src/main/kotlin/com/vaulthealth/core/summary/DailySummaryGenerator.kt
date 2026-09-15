@@ -42,7 +42,26 @@ data class DailyAggregate(
     val spo2Max: Double? = null,
     val weightKg: Double? = null,
     val workouts: List<WorkoutRef> = emptyList(),
-)
+) {
+    /**
+     * True only when something worth recording happened. Days with nothing (no movement, no
+     * sleep, no vitals, no weigh-in) get no note at all rather than an empty stub.
+     */
+    val hasData: Boolean
+        get() = (steps ?: 0L) > 0L ||
+            (distanceMeters ?: 0.0) > 0.0 ||
+            exerciseSessions > 0 ||
+            (activeCalories ?: 0.0) > 0.0 ||
+            (totalCalories ?: 0.0) > 0.0 ||
+            (sleepMinutes ?: 0L) > 0L ||
+            heartRateAvg != null ||
+            heartRateMin != null ||
+            heartRateMax != null ||
+            restingHeartRate != null ||
+            spo2Avg != null ||
+            weightKg != null ||
+            workouts.isNotEmpty()
+}
 
 /**
  * Deterministic Markdown renderer. Same input -> byte-identical output. No clock reads,

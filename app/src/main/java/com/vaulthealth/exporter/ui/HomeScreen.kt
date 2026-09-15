@@ -38,6 +38,7 @@ fun HomeScreen(
     onOpenHealthConnect: () -> Unit,
     onGrantRoute: (String) -> Unit,
     onSnapshotPreset: (Int) -> Unit,
+    onSnapshotAllTime: () -> Unit,
     onSnapshotCustom: (LocalDate, LocalDate) -> Unit,
     onExportNow: () -> Unit,
     onSetCadence: (ScheduleCadence) -> Unit,
@@ -123,6 +124,7 @@ fun HomeScreen(
                     Button(onClick = { onSnapshotPreset(30) }) { Text("30d") }
                     Button(onClick = { onSnapshotPreset(90) }) { Text("90d") }
                     Button(onClick = { onSnapshotPreset(365) }) { Text("365d") }
+                    Button(onClick = onSnapshotAllTime) { Text("All time") }
                 }
                 CustomRange(onSnapshotCustom)
                 Button(onClick = onExportNow, modifier = Modifier.fillMaxWidth()) { Text("Export now") }

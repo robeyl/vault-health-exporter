@@ -81,6 +81,26 @@ class DailySummaryTest {
     }
 
     @Test
+    fun `empty days report no data and produce no note`() {
+        val empty = DailyAggregate(
+            date = LocalDate.parse("2026-09-14"),
+            zone = zone,
+            generatedAt = Instant.parse("2026-09-15T02:00:00Z"),
+        )
+        assertFalse(empty.hasData)
+    }
+
+    @Test
+    fun `a day with any activity reports data`() {
+        val date = LocalDate.parse("2026-09-14")
+        val generatedAt = Instant.parse("2026-09-15T02:00:00Z")
+        assertTrue(aggregate().hasData)
+        assertTrue(DailyAggregate(date = date, zone = zone, generatedAt = generatedAt, steps = 1L).hasData)
+        assertTrue(DailyAggregate(date = date, zone = zone, generatedAt = generatedAt, weightKg = 74.0).hasData)
+        assertFalse(DailyAggregate(date = date, zone = zone, generatedAt = generatedAt, steps = 0L).hasData)
+    }
+
+    @Test
     fun `missing data degrades gracefully`() {
         val empty = DailyAggregate(
             date = LocalDate.parse("2026-09-14"),

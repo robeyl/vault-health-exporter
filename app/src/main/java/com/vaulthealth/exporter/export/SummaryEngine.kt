@@ -57,7 +57,11 @@ class SummaryEngine(
         records: List<HealthRecord>,
     ): WriteOutcome {
         val aggregate = SummaryAggregator.aggregate(day, zone, generatedAt, records)
+        val fileName = FileNames.summary(day)
+        if (!aggregate.hasData) {
+            return WriteOutcome.Skipped(fileName, "no activity on $day")
+        }
         val markdown = DailySummaryGenerator.render(aggregate)
-        return writer.writeDerived(treeUri, VaultPaths.SUMMARIES, FileNames.summary(day), markdown)
+        return writer.writeDerived(treeUri, VaultPaths.SUMMARIES, fileName, markdown)
     }
 }

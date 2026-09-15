@@ -5,6 +5,7 @@ import com.vaulthealth.core.checksum.Sha256
 import com.vaulthealth.core.dedup.Dedup
 import com.vaulthealth.core.model.HealthRecord
 import com.vaulthealth.core.model.NdjsonSchema
+import com.vaulthealth.core.model.RecordType
 import com.vaulthealth.core.model.VheJson
 import com.vaulthealth.core.model.RouteState
 import com.vaulthealth.core.naming.FileNames
@@ -28,11 +29,9 @@ import com.vaulthealth.exporter.storage.VaultWriter
 import com.vaulthealth.exporter.storage.db.ExportHistoryDao
 import com.vaulthealth.exporter.storage.db.ExportRecordEntity
 import com.vaulthealth.core.daterange.DateRange
-import kotlinx.serialization.builtins.ListSerializer
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 
 /**
  * One-time historical snapshot: reads a date range, writes a single immutable NDJSON file,
@@ -101,7 +100,7 @@ class SnapshotEngine(
             val dayOutcomes = summaries.writeFromRecords(
                 treeUri = treeUri,
                 records = deduped.records,
-                days = daysIn(range, zone),
+                days = summaryDays(deduped.records, zone),
                 zone = zone,
                 generatedAt = exportedAt,
             )
@@ -152,6 +151,7 @@ class SnapshotEngine(
     private fun messageFor(outcome: WriteOutcome, fileName: String): String = when (outcome) {
         is WriteOutcome.Written -> "Wrote $fileName and $fileName.sha256"
         is WriteOutcome.AlreadyExists -> "$fileName already exists; re-run to create a disambiguated copy"
+        is WriteOutcome.Skipped -> "Nothing to export: ${outcome.reason}"
         is WriteOutcome.Failed -> "Snapshot failed: ${outcome.reason}"
     }
 
@@ -167,12 +167,28 @@ class SnapshotEngine(
         return baseName
     }
 
-    private fun daysIn(range: DateRange, zone: ZoneId): List<LocalDate> {
-        val start = range.startLocalDate(zone)
-        val end = range.endLocalDate(zone)
-        val total = ChronoUnit.DAYS.between(start, end)
-        if (total < 0) return emptyList()
-        return (0..total).map { start.plusDays(it) }
+    /**
+     * Summary days are derived from the records that actually exist, not from the requested
+     * range. An "all time" snapshot therefore does not create a note for every day since 2000.
+     * Capped to the most recent [MAX_SUMMARY_DAYS] days with data.
+     */
+    private fun summaryDays(records: List<HealthRecord>, zone: ZoneId): List<LocalDate> {
+        val days = sortedSetOf<LocalDate>()
+        records.forEach { record ->
+            val anchor = if (record.type == RecordType.SLEEP && record.endTime != null) {
+                record.endTime
+            } else {
+                record.startTime
+            }
+            runCatching { Instant.parse(anchor).atZone(zone).toLocalDate() }
+                .getOrNull()
+                ?.let(days::add)
+        }
+        return days.toList().takeLast(MAX_SUMMARY_DAYS)
+    }
+
+    private companion object {
+        const val MAX_SUMMARY_DAYS = 400
     }
 }
 
