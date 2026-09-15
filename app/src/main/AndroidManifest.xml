@@ -63,10 +63,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
 
-            <!-- Health Connect permissions rationale screen. -->
+        <!--
+          Health Connect will not open its consent screen unless the app exposes an exported
+          activity that resolves androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE.
+        -->
+        <activity
+            android:name=".RationaleActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.VaultHealthExporter">
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 

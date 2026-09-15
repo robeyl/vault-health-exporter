@@ -38,9 +38,9 @@ class FileNamesTest {
     }
 
     @Test
-    fun `vault layout matches the agreed structure`() {
-        assertEquals("90 Private/Health/Raw/health-connect/snapshots", VaultPaths.SNAPSHOTS)
-        assertEquals("90 Private/Health/Raw/health-connect/deltas", VaultPaths.DELTAS)
-        assertEquals("90 Private/Health/Summaries", VaultPaths.SUMMARIES)
+    fun `vault layout is relative to the chosen folder`() {
+        assertEquals("snapshots", VaultPaths.SNAPSHOTS)
+        assertEquals("deltas", VaultPaths.DELTAS)
+        assertEquals("Summaries", VaultPaths.SUMMARIES)
     }
 }

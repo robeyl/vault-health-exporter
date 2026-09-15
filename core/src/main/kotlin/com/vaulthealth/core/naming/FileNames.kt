@@ -5,12 +5,14 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-/** Vault-relative locations. All writes are confined to these directories. */
+/**
+ * Vault-relative locations, rooted at the folder the user selects. Nothing here assumes an
+ * Obsidian directory structure: the user picks the destination, we write directly into it.
+ */
 object VaultPaths {
-    const val RAW_ROOT = "90 Private/Health/Raw/health-connect"
-    const val SNAPSHOTS = "$RAW_ROOT/snapshots"
-    const val DELTAS = "$RAW_ROOT/deltas"
-    const val SUMMARIES = "90 Private/Health/Summaries"
+    const val SNAPSHOTS = "snapshots"
+    const val DELTAS = "deltas"
+    const val SUMMARIES = "Summaries"
 }
 
 object FileNames {
