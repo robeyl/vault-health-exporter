@@ -190,7 +190,7 @@ class MainViewModel(
                 }
                 status.value = result.message + checksumNote(result.outcomes)
             } catch (t: Throwable) {
-                status.value = "Snapshot failed: ${t.message ?: t::class.java.simpleName}"
+                status.value = "Snapshot failed: ${describeError(t)}"
             } finally {
                 busy.value = false
                 refreshPermissions()
@@ -215,7 +215,7 @@ class MainViewModel(
                     is DeltaRun.Failed -> "Export failed: ${run.reason}"
                 }
             } catch (t: Throwable) {
-                status.value = "Export failed: ${t.message ?: t::class.java.simpleName}"
+                status.value = "Export failed: ${describeError(t)}"
             } finally {
                 busy.value = false
             }
@@ -305,8 +305,19 @@ class MainViewModel(
         )
     }
 
-    private fun checksumNote(outcomes: List<WriteOutcome>): String {
-        val written = outcomes.filterIsInstance<WriteOutcome.Written>()
+    private fun describeError(t: Throwable): String {
+        val message = t.message ?: t::class.java.simpleName
+        val looksLikePermission = message.contains("permission", ignoreCase = true) ||
+            message.contains("SecurityException", ignoreCase = true)
+        return if (looksLikePermission) {
+            "Health Connect access is missing. Tap \"Permissions\" above and grant read access, " +
+                "then try again. ($message)"
+        } else {
+            message
+        }
+    }
+
+    private fun checksumNote(outcomes: List<WriteOutcome>): String {        val written = outcomes.filterIsInstance<WriteOutcome.Written>()
         if (written.isEmpty()) return ""
         val verified = written.count { it.verified }
         return " • checksums verified for $verified/${written.size} files"

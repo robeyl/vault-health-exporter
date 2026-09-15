@@ -2,13 +2,17 @@ package com.vaulthealth.exporter
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.contracts.ExerciseRouteRequestContract
 import com.vaulthealth.exporter.hc.HealthPermissions
@@ -16,6 +20,8 @@ import com.vaulthealth.exporter.ui.HomeScreen
 import com.vaulthealth.exporter.ui.MainViewModel
 import com.vaulthealth.exporter.ui.theme.VaultHealthTheme
 import com.vaulthealth.exporter.work.WorkScheduler
+
+private const val ACTION_HEALTH_CONNECT_SETTINGS = "androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"
 
 class MainActivity : ComponentActivity() {
 
@@ -39,6 +45,14 @@ class MainActivity : ComponentActivity() {
     private val healthPermissionLauncher =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
             viewModel.onPermissionsResult(granted)
+            // IMPORTANT: only one activity-result contract may be launched at a time.
+            // Launching the runtime-permission dialog alongside this one cancels it, which
+            // means Health Connect never registers the app. Chain it instead.
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                activityRecognitionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
         }
 
     private val activityRecognitionLauncher =
@@ -67,27 +81,50 @@ class MainActivity : ComponentActivity() {
                 HomeScreen(
                     state = state,
                     onSelectFolder = { folderPicker.launch(null) },
+                    // Health Connect record permissions on their own. Never combine two launches.
                     onRequestPermissions = {
                         healthPermissionLauncher.launch(HealthPermissions.readPermissions)
-                        activityRecognitionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
                     },
+                    // Special grants must ride along with at least one record permission,
+                    // otherwise Health Connect has nothing to show on the consent screen.
                     onRequestHistory = {
-                        healthPermissionLauncher.launch(setOf(HealthPermissions.READ_HISTORY))
+                        healthPermissionLauncher.launch(
+                            HealthPermissions.readPermissions + HealthPermissions.READ_HISTORY,
+                        )
                     },
                     onRequestBackground = {
-                        healthPermissionLauncher.launch(setOf(HealthPermissions.READ_BACKGROUND))
+                        healthPermissionLauncher.launch(
+                            HealthPermissions.readPermissions + HealthPermissions.READ_BACKGROUND,
+                        )
                     },
+                    onOpenHealthConnect = { openHealthConnectSettings() },
                     onGrantRoute = { sessionId ->
                         routeSessionId = sessionId
                         routeLauncher.launch(sessionId)
                     },
-                    onSnapshotPreset = { days -> viewModel.runSnapshot(java.time.LocalDate.now().minusDays(days - 1L), java.time.LocalDate.now()) },
+                    onSnapshotPreset = { days ->
+                        viewModel.runSnapshot(
+                            java.time.LocalDate.now().minusDays(days - 1L),
+                            java.time.LocalDate.now(),
+                        )
+                    },
                     onSnapshotCustom = { start, end -> viewModel.runSnapshot(start, end) },
                     onExportNow = { viewModel.exportNow() },
                     onSetCadence = { viewModel.setCadence(it) },
                     onRefresh = { viewModel.refreshPermissions() },
                 )
             }
+        }
+    }
+
+    private fun openHealthConnectSettings() {
+        val intent = Intent(ACTION_HEALTH_CONNECT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opened = runCatching { startActivity(intent) }.isSuccess
+        if (!opened) {
+            val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.fromParts("package", packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { startActivity(fallback) }
         }
     }
 }

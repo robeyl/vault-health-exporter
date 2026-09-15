@@ -40,6 +40,7 @@ fun HomeScreen(
     onRequestPermissions: () -> Unit,
     onRequestHistory: () -> Unit,
     onRequestBackground: () -> Unit,
+    onOpenHealthConnect: () -> Unit,
     onGrantRoute: (String) -> Unit,
     onSnapshotPreset: (Int) -> Unit,
     onSnapshotCustom: (LocalDate, LocalDate) -> Unit,
@@ -104,16 +105,19 @@ fun HomeScreen(
                 Button(onClick = onRequestPermissions) { Text("Permissions") }
                 OutlinedButton(onClick = onRequestHistory) { Text("History") }
                 OutlinedButton(onClick = onRequestBackground) { Text("Background") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onRefresh) { Text("Refresh") }
+                OutlinedButton(onClick = onOpenHealthConnect) { Text("Open Health Connect") }
             }
         }
 
         Section("Historical snapshot (one-time)") {
             Text("Writes one immutable NDJSON + .sha256 into snapshots/.", style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onSnapshotPreset(30) }) { Text("Last 30 days") }
-                Button(onClick = { onSnapshotPreset(90) }) { Text("Last 90 days") }
-                Button(onClick = { onSnapshotPreset(365) }) { Text("Last 365 days") }
+                Button(onClick = { onSnapshotPreset(30) }) { Text("30d") }
+                Button(onClick = { onSnapshotPreset(90) }) { Text("90d") }
+                Button(onClick = { onSnapshotPreset(365) }) { Text("365d") }
             }
             CustomRange(onSnapshotCustom)
         }
