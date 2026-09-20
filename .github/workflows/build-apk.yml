@@ -1,0 +1,52 @@
+# Safety choices (from a source review on 20 Sep 2026):
+#  - builds exactly the commit that was reviewed, not whatever is newest;
+#  - uses an official Gradle 8.11.1 install instead of the repo's own gradlew / wrapper jar;
+#  - fails the build if the finished APK declares any network permission.
+name: Build debug APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 20759bc7bacf78d2be620e7ce58f28f918fdbf6c
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Installs the Android SDK command-line tools and accepts the licences.
+      - uses: android-actions/setup-android@v3
+
+      # The project is compiled against SDK 36 with build-tools 36.0.0 (see its README).
+      - name: Install SDK platform and build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      # Official Gradle, downloaded by the action; the repo's wrapper is not run.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Build the debug APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Verify the APK declares no network permission
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          echo "Checking $APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump permissions "$APK" | tee permissions.txt
+          if grep -q -E "INTERNET|ACCESS_NETWORK_STATE" permissions.txt; then
+            echo "FAIL: the APK declares a network permission"; exit 1
+          fi
+          echo "OK: no network permission declared"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vault-health-exporter-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
