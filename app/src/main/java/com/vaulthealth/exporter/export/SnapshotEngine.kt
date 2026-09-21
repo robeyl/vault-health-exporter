@@ -23,6 +23,7 @@ import com.vaulthealth.exporter.domain.ExportRunResult
 import com.vaulthealth.exporter.domain.PendingRouteConsent
 import com.vaulthealth.exporter.domain.WriteOutcome
 import com.vaulthealth.exporter.hc.HealthPermissions
+import androidx.health.connect.client.permission.HealthPermission
 import com.vaulthealth.exporter.hc.HealthConnectGateway
 import com.vaulthealth.exporter.hc.RecordMapper
 import com.vaulthealth.exporter.storage.VaultPrefs
@@ -55,10 +56,17 @@ class SnapshotEngine(
         val exportedAt = Instant.now()
         onProgress("Requesting a change token…")
         // Taken BEFORE reading so no changes can slip between snapshot and first delta.
-        val tokenBefore = gateway.newChangesToken(HealthPermissions.recordTypes)
+        // Health Connect refuses a change token that includes even one record type we lack
+        // read access to, so only ask about the types that are actually granted.
+        val grantedPermissions = gateway.grantedPermissions()
+        val readableTypes = HealthPermissions.recordTypes.filter { klass ->
+            val permission = runCatching { HealthPermission.getReadPermission(klass) }.getOrNull()
+            permission != null && permission in grantedPermissions
+        }.toSet()
+        val tokenBefore = gateway.newChangesToken(readableTypes)
 
         onProgress("Reading Health Connect records…")
-        val native = HealthPermissions.recordTypes.flatMap { klass ->
+        val native = readableTypes.flatMap { klass ->
             gateway.readAllOrEmpty(klass, range.start, range.end)
         }
         val mapped = native.mapNotNull { RecordMapper.map(it, allowRoutes) }
